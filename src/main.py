@@ -140,6 +140,7 @@ def lambda_handler(event, context):
     color_array = []
     query = f"SELECT colors FROM running_colors WHERE activity_id in (SELECT id FROM activity WHERE YEAR(start_date_local) = {current_year})"
     result = db.get_specific(custom=query)
+
     for item in result:
         try:
             colors = item[0].split(', ')
@@ -150,7 +151,7 @@ def lambda_handler(event, context):
             log.info(item[0].split(', '))
             exit()
     log.info(hex_average(color_array))
-
+    del result
     data = {}
     years = []
     wind_direction_array = {}
@@ -168,14 +169,13 @@ def lambda_handler(event, context):
         temp_array[item[0]] = []
         humidity_array[item[0]] = []
         years.append(item[0])
-
+    del result_year
     query = F"SELECT weather_meteo.temp, weather_meteo.wind_direction, weather_meteo.wind_speed, weather_meteo.humidity, year(activity.start_date_local), activity.id  " \
             F"FROM weather_meteo " \
             F"INNER JOIN activity ON activity.id = weather_meteo.activity_id WHERE YEAR(start_date_local) = {current_year} ORDER BY year(activity.start_date_local)"
     result_weather = db.get_specific(custom=query)
 
     for item in result_weather:
-        log.info(item[5])
         try:
             wind_direction = item[1].split(', ')
             wind_speed = item[2].split(', ')
@@ -190,7 +190,7 @@ def lambda_handler(event, context):
             log.info(item)
 
             exit()
-
+    del result_weather
     for year in years:
         average_wind_direction = round(sum(map(float, wind_direction_array[year])) / len(wind_direction_array[year]), 1)
         average_wind_speed = round(sum(map(float, wind_speed_array[year])) / len(wind_speed_array[year]), 1)
@@ -225,7 +225,7 @@ def lambda_handler(event, context):
         data[year]["elapsed_time"] = elapsed_time
         data[year]["moving_time"] = moving_time
         data[year]["average_hr"] = average_hr
-
+    del result_activity
     for item in data:
         try:
             json_data = {
@@ -239,3 +239,5 @@ def lambda_handler(event, context):
                 'value': json.dumps(data[item])
             }
             db.insert(table='stats', json_data=json_data)
+
+lambda_handler(None, None)
