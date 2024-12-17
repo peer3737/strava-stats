@@ -6,6 +6,7 @@ import os
 import math
 import json
 import uuid
+import boto3
 
 
 class CorrelationIdFilter(logging.Filter):
@@ -239,3 +240,6 @@ def lambda_handler(event, context):
                 'value': json.dumps(data[item])
             }
             db.insert(table='stats', json_data=json_data)
+
+
+lambda_handler(None, None)

@@ -1,1 +1,5 @@
 .idea/
+database/__pycache__/__init__.cpython-311.pyc
+database/__pycache__/db.cpython-311.pyc
+supporting/__pycache__/__init__.cpython-311.pyc
+supporting/__pycache__/aws.cpython-311.pyc
