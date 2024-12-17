@@ -173,7 +173,7 @@ def lambda_handler(event, context):
 
     for year in years:
         data[year]["average_wind_direction"] = wind_direction_array[year]
-        data[year]["average_wind_speed"] = wind_direction_array[year]
+        data[year]["average_wind_speed"] = wind_speed_array[year]
         data[year]["average_temp"] = temp_array[year]
         data[year]["average_humidity"] = humidity_array[year]
 
@@ -217,3 +217,4 @@ def lambda_handler(event, context):
             }
             db.insert(table='stats', json_data=json_data)
 
+lambda_handler(None, None)
