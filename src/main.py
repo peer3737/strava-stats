@@ -7,6 +7,7 @@ import math
 import json
 import uuid
 
+
 class CorrelationIdFilter(logging.Filter):
     def __init__(self):
         super().__init__()
@@ -93,40 +94,6 @@ def total_time(time):
     return return_time.strip()
 
 
-def hex_average(hex_colors):
-    colors = {
-        0: "FF0000", 5: "FF1100", 10: "FF2200", 15: "FF3300", 20: "FF4400",
-        25: "FF5500", 30: "FF6600", 35: "FF7700", 40: "FF8800", 45: "FF8800",
-        50: "FF9800", 55: "FFA800", 60: "FFB800", 65: "FFC800", 70: "FFD800",
-        75: "FFE800", 80: "FFF000", 85: "FFFF00", 90: "FFFF00", 95: "EFFF00",
-        100: "DFFF00", 105: "CFFF00", 110: "BFFF00", 115: "AFFF00", 120: "9FFF00",
-        125: "8FFF00", 130: "88FF00", 135: "88FF00", 140: "78FF00", 145: "68FF00",
-        150: "58FF00", 155: "48FF00", 160: "38FF00", 165: "28FF00", 170: "18FF00",
-        175: "08FF00", 180: "00FF00"
-    }
-
-    # Convert the input colors to their respective keys in the `colors` dictionary
-    total = 0
-    count = len(hex_colors)
-
-    for hex_code in hex_colors:
-        # Find the key corresponding to the hex value
-        value = next((key for key, val in colors.items() if val == hex_code.strip()), None)
-        if value is not None:
-            total += value
-
-    # Calculate the average value
-    average = total / count
-
-    # Find the closest key to the average
-    closest_key = min(colors.keys(), key=lambda key: abs(average - key))
-
-    # Get the corresponding color for the closest key
-    closest_color = colors[closest_key]
-
-    return f"#{closest_color}"
-
-
 def lambda_handler(event, context):
     database_id = os.getenv('DATABASE_ID')
     database_settings = aws.dynamodb_query(table='database_settings', id=database_id)
@@ -137,21 +104,7 @@ def lambda_handler(event, context):
     db = Connection(user=db_user, password=db_password, host=db_host, port=db_port, charset="utf8mb4")
     log.info('START')
     current_year = datetime.now().year
-    color_array = []
-    query = f"SELECT colors FROM running_colors WHERE activity_id in (SELECT id FROM activity WHERE YEAR(start_date_local) = {current_year})"
-    result = db.get_specific(custom=query)
 
-    for item in result:
-        try:
-            colors = item[0].split(', ')
-            color_array.extend(colors)
-        except Exception as e:
-            log.info(e)
-            log.info(color_array)
-            log.info(item[0].split(', '))
-            exit()
-    log.info(hex_average(color_array))
-    del result
     data = {}
     years = []
     wind_direction_array = {}
@@ -163,43 +116,66 @@ def lambda_handler(event, context):
     result_year = db.get_specific(custom=query)
     for item in result_year:
         data[item[0]] = {}
-        wind_direction_array[item[0]] = []
-        wind_direction_array[item[0]] = []
-        wind_speed_array[item[0]] = []
-        temp_array[item[0]] = []
-        humidity_array[item[0]] = []
+        wind_direction_array[item[0]] = 0
+        wind_direction_array[item[0]] = 0
+        wind_speed_array[item[0]] = 0
+        temp_array[item[0]] = 0
+        humidity_array[item[0]] = 0
         years.append(item[0])
     del result_year
+
     query = F"SELECT weather_meteo.temp, weather_meteo.wind_direction, weather_meteo.wind_speed, weather_meteo.humidity, year(activity.start_date_local), activity.id  " \
             F"FROM weather_meteo " \
             F"INNER JOIN activity ON activity.id = weather_meteo.activity_id WHERE YEAR(start_date_local) = {current_year} ORDER BY year(activity.start_date_local)"
     result_weather = db.get_specific(custom=query)
-
+    total_wind_direction = 0
+    total_wind_speed = 0
+    total_temp = 0
+    total_humidity = 0
+    count_wind_direction = 0
+    count_wind_speed = 0
+    count_temp = 0
+    count_humidity = 0
     for item in result_weather:
         try:
             wind_direction = item[1].split(', ')
+            for wind in wind_direction:
+                total_wind_direction += float(wind)
+                count_wind_direction += 1
+            del wind_direction
             wind_speed = item[2].split(', ')
+            for wind in wind_speed:
+                total_wind_speed += float(wind)
+                count_wind_speed += 1
+            del wind_speed
             temp = item[0].split(', ')
+            for t in temp:
+                total_temp += float(t)
+                count_temp += 1
+
             humidity = item[3].split(', ')
-            wind_direction_array[item[4]].extend(wind_direction)
-            wind_speed_array[item[4]].extend(wind_speed)
-            temp_array[item[4]].extend(temp)
-            humidity_array[item[4]].extend(humidity)
+            del temp
+            for h in humidity:
+                total_humidity += float(h)
+                count_humidity += 1
+            del humidity
+            wind_direction_array[item[4]] = round(total_wind_direction / count_wind_direction, 1)
+            wind_speed_array[item[4]] = round(total_wind_speed / count_wind_speed, 1)
+            temp_array[item[4]] = round(total_temp / count_temp, 1)
+            humidity_array[item[4]] = round(total_humidity / count_humidity, 1)
+
         except Exception as e:
             log.info(e)
             log.info(item)
 
             exit()
     del result_weather
+
     for year in years:
-        average_wind_direction = round(sum(map(float, wind_direction_array[year])) / len(wind_direction_array[year]), 1)
-        average_wind_speed = round(sum(map(float, wind_speed_array[year])) / len(wind_speed_array[year]), 1)
-        average_temp = round(sum(map(float, temp_array[year])) / len(temp_array[year]), 1)
-        average_humidity = round(sum(map(float, humidity_array[year])) / len(humidity_array[year]), 1)
-        data[year]["average_wind_direction"] = average_wind_direction
-        data[year]["average_wind_speed"] = average_wind_speed
-        data[year]["average_temp"] = average_temp
-        data[year]["average_humidity"] = average_humidity
+        data[year]["average_wind_direction"] = wind_direction_array[year]
+        data[year]["average_wind_speed"] = wind_direction_array[year]
+        data[year]["average_temp"] = temp_array[year]
+        data[year]["average_humidity"] = humidity_array[year]
 
     query = f"SELECT YEAR(start_date_local), sum(distance), sum(moving_time), sum(elapsed_time), avg(average_heartrate) FROM activity WHERE sport_type = 'Run' and distance <> 0 AND YEAR(start_date_local) = {current_year} group by YEAR(start_date_local) order by YEAR(start_date_local) desc "
     result_activity = db.get_specific(custom=query)
@@ -226,6 +202,7 @@ def lambda_handler(event, context):
         data[year]["moving_time"] = moving_time
         data[year]["average_hr"] = average_hr
     del result_activity
+
     for item in data:
         try:
             json_data = {
@@ -239,3 +216,4 @@ def lambda_handler(event, context):
                 'value': json.dumps(data[item])
             }
             db.insert(table='stats', json_data=json_data)
+
