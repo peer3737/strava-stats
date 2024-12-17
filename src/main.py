@@ -138,15 +138,16 @@ def lambda_handler(event, context):
     log.info('START')
     current_year = datetime.now().year
     color_array = []
-    result = db.get_all(table='running_colors', type='all')
+    query = f"SELECT colors FROM running_colors WHERE activity_id in (SELECT id FROM activity WHERE YEAR(start_date_local) = {current_year})"
+    result = db.get_specific(custom=query)
     for item in result:
         try:
-            colors = item[2].split(', ')
+            colors = item[0].split(', ')
             color_array.extend(colors)
         except Exception as e:
             log.info(e)
             log.info(color_array)
-            log.info(item[2].split(', '))
+            log.info(item[0].split(', '))
             exit()
     log.info(hex_average(color_array))
 
