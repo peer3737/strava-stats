@@ -216,5 +216,3 @@ def lambda_handler(event, context):
                 'value': json.dumps(data[item])
             }
             db.insert(table='stats', json_data=json_data)
-
-lambda_handler(None, None)
